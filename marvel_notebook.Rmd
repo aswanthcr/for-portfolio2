@@ -1,0 +1,309 @@
+---
+title: "marvel_analysis"
+author: "aswanth"
+date: "2024-03-05"
+output: html_document
+---
+
+## R Markdown
+### Marvel analysis
+In the given marvel data table contains movie name, released date, budget,four 
+types of box office collection, four different ratings, Production company etc.
+
+
+*Setting up necessary packages for current environment.*
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+library(janitor)
+library(dplyr)
+library(readr)
+```
+
+
+
+**Import marvel data frame.**
+
+```{r}
+marvel_data <-read_csv("Data/marvel_box_office.csv")
+```
+
+
+
+**data frame details.**
+
+```{r}
+glimpse(marvel_data)
+```
+
+
+
+*converting all variable names to standard format*
+
+```{r}
+marvel_data <- clean_names(marvel_data)
+```
+
+
+
+```{r}
+head(marvel_data)
+```
+
+
+
+**Number of movies released in each production company**
+```{r}
+marvel_data |>
+  ggplot(aes(x = ownership))+
+  geom_bar(aes(fill = ownership))
+```
+
+
+
+**Number of movies in each phase**
+```{r}
+ggplot(marvel_data, aes(x = phase))+
+  geom_bar(aes(fill = phase))
+```
+
+
+
+**Number of movies released in each year and month**
+```{r}
+marvel_data |>
+  ggplot(aes(x = release_year, fill = ownership))+
+  geom_bar()
+```
+
+
+
+```{r}
+marvel_data |>
+  count(release_month, sort = TRUE)
+
+marvel_data |>
+  ggplot(aes(x = release_month))+
+  geom_bar(aes(fill = ownership),position = "dodge")+
+  theme(axis.text.x = element_text(angle = 45))
+```
+
+
+
+**Total budget and world wide box office collection for movies**
+**that released in each year**
+```{r}
+marvel_data |>
+  group_by(release_year)|>
+  summarise(total_budget = sum(budget),
+            total_collction_worldwide = sum(worldwide_box_office))|>
+  ggplot(aes(x = release_year))+
+  geom_col(aes(y = total_budget, fill = release_year))+
+  geom_line(aes(y = total_collction_worldwide))+
+  labs(y = "budget and world wide collection")
+```
+
+
+
+**relationship between budget and worldwide collection of each movies**
+
+```{r}
+ marvel_data |>
+   arrange(release_year) |>
+   ggplot(aes(x = budget, y = worldwide_box_office, color = release_year))+
+   geom_point(position = "jitter")+
+   facet_wrap(~phase)
+```
+
+
+
+**movie which have highest and lowest budget**
+
+```{r}
+marvel_data |>
+  slice_max(budget)
+```
+
+
+
+```{r}
+marvel_data |>
+  slice_min(budget)
+```
+
+
+
+**Movies that have highest and lowest international collection in each year**
+
+```{r}
+marvel_max <- marvel_data |>
+  group_by(release_year) |>
+  slice_max(international_box_office) |>
+  select(movie, release_year, international_box_office, budget)|>
+  arrange(release_year)
+```
+
+
+
+```{r}
+marvel_min <- marvel_data |>
+  group_by(release_year)|>
+  slice_min(international_box_office) |>
+  select(movie, release_year, international_box_office, budget)
+```
+
+
+
+```{r}
+ggplot()+
+  geom_col(data = marvel_max,
+           aes(x = release_year, y = international_box_office), fill = "blue")+
+  geom_col(data = marvel_min, 
+           aes(x = release_year, y = international_box_office), fill = "orange")
+```
+
+
+
+**total box office collection and budget in each year**
+
+```{r}
+mcu_collect <- marvel_data |>
+  group_by(release_year, ownership) |>
+  summarise(across(c(domestic_box_office, inflation_adjusted_domestic, 
+              international_box_office, inflation_adjusted_international, 
+              worldwide_box_office, inflation_adjusted_worldwide, 
+              opening_weekend, inflation_adjusted_opening_weekend, 
+              budget, inflation_adjusted_budget),sum),
+            .groups = 'drop')
+```
+
+
+
+```{r}
+head(mcu_collect)
+```
+
+
+
+**domestic, international, world wide and opening weekend box office collecton**
+**in each year for every company**
+
+```{r}
+mcu_collect |>
+  ggplot(aes(x = release_year))+
+  geom_line(aes(y = domestic_box_office),color = "green")+
+  geom_line(aes(y = international_box_office), color = "red")+
+  geom_line(aes(y = worldwide_box_office), color = "black")+
+  geom_line(aes(y = opening_weekend), color = "blue")+
+  facet_wrap(~ownership)
+```
+
+
+
+**Budget Vs imdb score**
+
+```{r}
+ marvel_data |>
+   ggplot(aes(x = im_db_score, y = budget))+
+   geom_point(position = "jitter", color = "blue")+
+   facet_wrap(~ownership)
+```
+
+
+
+**world wide box office collection Vs imdb score**
+
+```{r}
+marvel_data |>
+   ggplot(aes(x = im_db_score, y = worldwide_box_office))+
+   geom_point(position = "jitter")+
+   facet_wrap(~ownership)
+```
+
+
+
+**international box office collection Vs imdb score**
+
+```{r}
+marvel_data |>
+   ggplot(aes(x = im_db_score, y = international_box_office))+
+   geom_point(color = "blue", position = "jitter")+
+   facet_wrap(~ownership)
+```
+
+
+
+**finding the mean of all ratings**
+
+```{r}
+imdb_mean <- mean(marvel_data$im_db_score)
+meta_mean <- mean(marvel_data$meta_score)
+tomato_mean <- mean(marvel_data$tomatometer)
+rotten_mean <- mean(marvel_data$rotten_tomato_audience_score)
+```
+
+
+
+**movies which is higher or lower of each ratings**
+
+```{r}
+marvel_ratings <- marvel_data |>
+   mutate(imdb_rate = ifelse(im_db_score > imdb_mean, "above_mean", "below_mean"))|>
+   mutate(meta_rate = ifelse(meta_score > meta_mean, "above_mean","below_mean"))|>
+   mutate(tomato_rate = ifelse(tomatometer > tomato_mean, "above_mean","below_mean"))|>
+   mutate(rotten_rate = ifelse(rotten_tomato_audience_score > rotten_mean,  
+                               "above_mean","below_mean"))
+```
+
+
+
+```{r}
+head(marvel_ratings)
+```
+
+
+
+**Number of movies which is higher or lower than its mean ratings.**
+
+```{r}
+marvel_ratings |>
+   select(movie, release_year, ownership, imdb_rate,meta_rate, tomato_rate, rotten_rate)|>
+   pivot_longer(
+     cols = imdb_rate:rotten_rate,
+     names_to = "all_ratings",
+     values_to = "above_or_below"
+   ) |>
+   ggplot(aes(x = above_or_below))+
+   geom_bar(aes(fill = all_ratings),position = "dodge") +
+   facet_wrap(~ownership)
+```
+
+
+
+**Number of movies which is higher or lower than its mean ratings for all **
+**box offices and ratings**
+
+```{r}
+marvel_ratings |>
+   select(movie, release_year, ownership,ends_with("rate"),
+          ends_with("box_office"))|>
+   pivot_longer(
+     cols = ends_with("box_office"),
+     names_to = "box_office_type",
+     values_to = "collection"
+   ) |>
+   pivot_longer(
+     cols = imdb_rate:rotten_rate,
+     names_to = "all_ratings",
+     values_to = "above_or_below"
+   )|>
+   ggplot(aes(x = release_year, y = collection))+
+   geom_line(aes(color = above_or_below), position = "jitter")+
+   facet_grid(box_office_type~all_ratings)+
+   theme(axis.text.x = element_text(angle = 45))
+```
+
+
+
+
